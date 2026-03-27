@@ -13,7 +13,7 @@
 
 ## Goal
 
-- `go.mod` を `github.com/youyo/imgraft` module として初期化し、kong / BurntSushi/toml / golang.org/x/image の 3 依存を追加する
+- `go.mod` を `github.com/youyo/imgraft` module として初期化する（依存ライブラリは各マイルストーンで必要になったタイミングで追加。M01 では外部依存なし）
 - `internal/runtime` パッケージを実装し、後続マイルストーン（M02 config, M10 output naming）が共通利用できる基礎を提供する
 - 設定ディレクトリパス解決・環境変数読取・時刻抽象の 3 ユーティリティをテスト可能な形で実装する
 
@@ -124,12 +124,9 @@ sequenceDiagram
 
 | # | テストケース | 入力 | 期待出力 |
 |---|-------------|------|---------|
-| 6 | Lookup: 環境変数が設定されている | `t.Setenv("IMGRAFT_X", "val")` | "val", true |
-| 7 | Lookup: 環境変数が未設定 | 未設定 | "", false |
-| 8 | Lookup: 環境変数が空文字でセットされている | `t.Setenv("IMGRAFT_X", "")` | "", true (セットと未設定を区別) |
-| 9 | GetWithDefault: 未設定ならデフォルト値を返す | 未設定, default="flash" | "flash" |
-| 10 | GetWithDefault: 設定されていればその値を返す | `t.Setenv("IMGRAFT_Y", "pro")`, default="flash" | "pro" |
-| 11 | GetWithDefault: 空文字でセットされていてもデフォルトに戻さない | `t.Setenv("IMGRAFT_Y", "")`, default="flash" | "" (空文字尊重) |
+| 6 | GetWithDefault: 未設定ならデフォルト値を返す | 未設定, default="flash" | "flash" |
+| 7 | GetWithDefault: 設定されていればその値を返す | `t.Setenv("IMGRAFT_Y", "pro")`, default="flash" | "pro" |
+| 8 | GetWithDefault: 空文字でセットされていてもデフォルトに戻さない | `t.Setenv("IMGRAFT_Y", "")`, default="flash" | "" (空文字尊重) |
 
 ### `internal/runtime/clock_test.go`
 
@@ -146,17 +143,20 @@ sequenceDiagram
 ## Implementation Steps
 
 - [ ] Step 1: `go mod init github.com/youyo/imgraft` で go.mod 作成（`go 1.26`）
-- [ ] Step 2: `go get github.com/alecthomas/kong` 追加
-- [ ] Step 3: `go get github.com/BurntSushi/toml` 追加
-- [ ] Step 4: `go get golang.org/x/image` 追加
-- [ ] Step 5: `internal/runtime/clock_test.go` 作成（Red: コンパイルエラー状態）
-- [ ] Step 6: `internal/runtime/clock.go` 実装（Green: テスト全件パス）
-- [ ] Step 7: `internal/runtime/paths_test.go` 作成（Red）
-- [ ] Step 8: `internal/runtime/paths.go` 実装（Green）
-- [ ] Step 9: `internal/runtime/env_test.go` 作成（Red）
-- [ ] Step 10: `internal/runtime/env.go` 実装（Green）
-- [ ] Step 11: `go vet ./...` でリント確認
-- [ ] Step 12: `go test ./internal/runtime/ -v` で全件グリーン確認
+- [ ] Step 2: `cmd/imgraft/main.go` 作成（最小エントリポイント）
+- [ ] Step 3: `internal/runtime/clock_test.go` 作成（Red: コンパイルエラー状態）
+- [ ] Step 4: `internal/runtime/clock.go` 実装（Green: テスト全件パス）
+- [ ] Step 5: `internal/runtime/paths_test.go` 作成（Red）
+- [ ] Step 6: `internal/runtime/paths.go` 実装（Green）
+- [ ] Step 7: `internal/runtime/env_test.go` 作成（Red）
+- [ ] Step 8: `internal/runtime/env.go` 実装（Green）— Lookup は不要、GetWithDefault のみ
+- [ ] Step 9: `go vet ./...` でリント確認
+- [ ] Step 10: `go test ./internal/runtime/ -v` で全件グリーン確認
+
+> **注記（弁証法レビュー反映）:**
+> - 外部依存ライブラリ（kong, BurntSushi/toml, golang.org/x/image）は M01 では追加しない。各マイルストーンで必要になったタイミングで追加する（`go mod tidy` で未使用依存が削除されるため）
+> - env.go の `Lookup` 関数は削除。`os.LookupEnv` の薄いラッパーは YAGNI。`GetWithDefault` のみ提供
+> - `internal/runtime` パッケージ名は SPEC.md 準拠を優先。標準ライブラリ `runtime` との衝突は `import alias` で対処（例: `goruntime "runtime"`）
 
 ---
 
@@ -242,12 +242,6 @@ func CredentialsFilePath() (string, error) {
 package runtime
 
 import "os"
-
-// Lookup は os.LookupEnv のシンラッパー。
-// セット済みかどうかを bool で区別できる（空文字セットと未設定を区別）。
-func Lookup(key string) (string, bool) {
-    return os.LookupEnv(key)
-}
 
 // GetWithDefault は環境変数を取得し、未設定なら defaultVal を返す。
 // 空文字でセットされている場合は空文字を返す（デフォルト値に戻さない）。
