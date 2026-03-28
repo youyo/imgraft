@@ -323,6 +323,188 @@ func TestRun_EmptyPromptError(t *testing.T) {
 	}
 }
 
+// TestRun_FallbackOnRateLimit は pro モデルで RATE_LIMIT_EXCEEDED 時に flash へ自動フォールバックすることを確認する。
+func TestRun_FallbackOnRateLimit(t *testing.T) {
+	credPath := makeTempCredentials(t, "test-api-key")
+	outDir := t.TempDir()
+
+	callCount := 0
+	var calledModels []string
+	mock := &mockStudioClient{
+		generateFn: func(ctx context.Context, req studio.GenerateRequest) (studio.GenerateResponse, http.Header, error) {
+			callCount++
+			calledModels = append(calledModels, req.Model)
+			if req.Model == "gemini-3-pro-image-preview" {
+				// pro はレートリミットエラー
+				return studio.GenerateResponse{}, nil, errs.New(errs.ErrRateLimitExceeded, "rate limit")
+			}
+			// flash は成功
+			return studio.GenerateResponse{
+				ImageData: minimalPNG,
+				MimeType:  "image/png",
+			}, http.Header{}, nil
+		},
+	}
+	deps := makeFixedDeps(t, mock, credPath)
+
+	input := app.RunInput{
+		Prompt:     "blue robot mascot",
+		ModelAlias: "pro",
+		Dir:        outDir,
+	}
+
+	result := app.Run(context.Background(), input, deps)
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit code 0 after fallback, got %d; error: %v", result.ExitCode, result.Output.Error)
+	}
+	if !result.Output.Success {
+		t.Error("expected success=true after fallback")
+	}
+	// Generate は 2 回呼ばれるはず（pro → flash）
+	if callCount != 2 {
+		t.Errorf("expected 2 calls (pro then flash), got %d", callCount)
+	}
+	// 最終モデルは flash
+	if result.Output.Model == nil || *result.Output.Model != "gemini-3.1-flash-image-preview" {
+		got := ""
+		if result.Output.Model != nil {
+			got = *result.Output.Model
+		}
+		t.Errorf("expected final model %q, got %q", "gemini-3.1-flash-image-preview", got)
+	}
+	// warnings にフォールバック情報が含まれる
+	if len(result.Output.Warnings) == 0 {
+		t.Error("expected at least one warning about fallback")
+	}
+}
+
+// TestRun_FallbackOnBackendUnavailable は pro モデルで BACKEND_UNAVAILABLE 時に flash へフォールバックすることを確認する。
+func TestRun_FallbackOnBackendUnavailable(t *testing.T) {
+	credPath := makeTempCredentials(t, "test-api-key")
+	outDir := t.TempDir()
+
+	mock := &mockStudioClient{
+		generateFn: func(ctx context.Context, req studio.GenerateRequest) (studio.GenerateResponse, http.Header, error) {
+			if req.Model == "gemini-3-pro-image-preview" {
+				return studio.GenerateResponse{}, nil, errs.New(errs.ErrBackendUnavailable, "backend down")
+			}
+			return studio.GenerateResponse{
+				ImageData: minimalPNG,
+				MimeType:  "image/png",
+			}, http.Header{}, nil
+		},
+	}
+	deps := makeFixedDeps(t, mock, credPath)
+
+	input := app.RunInput{
+		Prompt:     "blue robot mascot",
+		ModelAlias: "pro",
+		Dir:        outDir,
+	}
+
+	result := app.Run(context.Background(), input, deps)
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit code 0 after fallback, got %d; error: %v", result.ExitCode, result.Output.Error)
+	}
+	if len(result.Output.Warnings) == 0 {
+		t.Error("expected at least one warning about fallback")
+	}
+}
+
+// TestRun_NoFallbackForFlash は flash モデルでエラーが発生した場合はフォールバックしないことを確認する。
+func TestRun_NoFallbackForFlash(t *testing.T) {
+	credPath := makeTempCredentials(t, "test-api-key")
+	outDir := t.TempDir()
+
+	callCount := 0
+	mock := &mockStudioClient{
+		generateFn: func(ctx context.Context, req studio.GenerateRequest) (studio.GenerateResponse, http.Header, error) {
+			callCount++
+			return studio.GenerateResponse{}, nil, errs.New(errs.ErrRateLimitExceeded, "rate limit")
+		},
+	}
+	deps := makeFixedDeps(t, mock, credPath)
+
+	input := app.RunInput{
+		Prompt:     "blue robot mascot",
+		ModelAlias: "flash",
+		Dir:        outDir,
+	}
+
+	result := app.Run(context.Background(), input, deps)
+	if result.ExitCode != 1 {
+		t.Fatalf("expected exit code 1 (no fallback for flash), got %d", result.ExitCode)
+	}
+	// flash はフォールバック先がないため 1 回だけ呼ばれる
+	if callCount != 1 {
+		t.Errorf("expected 1 call (no fallback), got %d", callCount)
+	}
+}
+
+// TestRun_FallbackOnPermissionDenied は pro モデルで PERMISSION_DENIED (AUTH_INVALID) 時にフォールバックすることを確認する。
+func TestRun_FallbackOnPermissionDenied(t *testing.T) {
+	credPath := makeTempCredentials(t, "test-api-key")
+	outDir := t.TempDir()
+
+	mock := &mockStudioClient{
+		generateFn: func(ctx context.Context, req studio.GenerateRequest) (studio.GenerateResponse, http.Header, error) {
+			if req.Model == "gemini-3-pro-image-preview" {
+				return studio.GenerateResponse{}, nil, errs.New(errs.ErrAuthInvalid, "permission denied")
+			}
+			return studio.GenerateResponse{
+				ImageData: minimalPNG,
+				MimeType:  "image/png",
+			}, http.Header{}, nil
+		},
+	}
+	deps := makeFixedDeps(t, mock, credPath)
+
+	input := app.RunInput{
+		Prompt:     "blue robot mascot",
+		ModelAlias: "pro",
+		Dir:        outDir,
+	}
+
+	result := app.Run(context.Background(), input, deps)
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit code 0 after fallback, got %d; error: %v", result.ExitCode, result.Output.Error)
+	}
+	if len(result.Output.Warnings) == 0 {
+		t.Error("expected at least one warning about fallback")
+	}
+}
+
+// TestRun_FallbackOnlyOnce はフォールバックが最大 1 回だけ行われることを確認する。
+func TestRun_FallbackOnlyOnce(t *testing.T) {
+	credPath := makeTempCredentials(t, "test-api-key")
+	outDir := t.TempDir()
+
+	callCount := 0
+	mock := &mockStudioClient{
+		generateFn: func(ctx context.Context, req studio.GenerateRequest) (studio.GenerateResponse, http.Header, error) {
+			callCount++
+			// 常にフォールバック対象エラーを返す
+			return studio.GenerateResponse{}, nil, errs.New(errs.ErrRateLimitExceeded, "rate limit")
+		},
+	}
+	deps := makeFixedDeps(t, mock, credPath)
+
+	input := app.RunInput{
+		Prompt:     "blue robot mascot",
+		ModelAlias: "pro",
+		Dir:        outDir,
+	}
+
+	result := app.Run(context.Background(), input, deps)
+	if result.ExitCode != 1 {
+		t.Fatalf("expected exit code 1 (flash also fails), got %d", result.ExitCode)
+	}
+	// pro + flash = 2 回だけ（無限ループしない）
+	if callCount != 2 {
+		t.Errorf("expected exactly 2 calls (pro then flash, no more), got %d", callCount)
+	}
+}
+
 func TestRun_OutputIsValidJSON(t *testing.T) {
 	credPath := makeTempCredentials(t, "test-api-key")
 	outDir := t.TempDir()

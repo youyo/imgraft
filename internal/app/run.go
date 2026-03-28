@@ -115,16 +115,30 @@ func Run(ctx context.Context, input RunInput, deps Dependencies) RunOutput {
 	// prompt.Parts から SystemPrompt と UserPrompt を抽出
 	systemPromptText, userPromptText := extractPromptParts(parts)
 
-	// ステップ 9: API generate
+	// ステップ 9: API generate（フォールバック付き）
 	client := deps.StudioClientFactory(apiKey)
 	genReq := studio.GenerateRequest{
 		Model:        modelName,
 		Prompt:       userPromptText,
 		SystemPrompt: systemPromptText,
 	}
+
+	var warnings []string
 	genResp, _, err := client.Generate(ctx, genReq)
 	if err != nil {
-		return errorOutput(&modelName, strPtr(backend), err)
+		// フォールバック可能か判定する（最大 1 回のみ）
+		if model.IsFallbackError(err) {
+			if fallbackModel, ok := model.FallbackModel(modelName); ok {
+				// フォールバック警告を記録
+				warnings = append(warnings, model.FallbackWarning(modelName, fallbackModel))
+				modelName = fallbackModel
+				genReq.Model = fallbackModel
+				genResp, _, err = client.Generate(ctx, genReq)
+			}
+		}
+		if err != nil {
+			return errorOutput(&modelName, strPtr(backend), err)
+		}
 	}
 
 	// ステップ 10: Transparent pipeline（M14/M15 以降）
@@ -152,6 +166,9 @@ func Run(ctx context.Context, input RunInput, deps Dependencies) RunOutput {
 	backendStr := backend
 	out.Backend = &backendStr
 	out.Images = []output.ImageItem{item}
+	if len(warnings) > 0 {
+		out.Warnings = warnings
+	}
 
 	return RunOutput{
 		Output:   out,
