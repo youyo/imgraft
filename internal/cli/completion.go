@@ -102,7 +102,7 @@ _imgraft() {
   esac
 }
 
-_imgraft "$@"
+compdef _imgraft imgraft
 `
 	_, err := fmt.Fprint(w, script)
 	return err
