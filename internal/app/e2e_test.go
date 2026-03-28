@@ -37,7 +37,14 @@ func TestE2E_GenerateImage(t *testing.T) {
 
 	result := app.Run(context.Background(), input, deps)
 	if result.ExitCode != 0 {
-		t.Fatalf("expected exit code 0, got %d; error: %+v", result.ExitCode, result.Output.Error)
+		code, msg := "<nil>", "<nil>"
+		if result.Output.Error.Code != nil {
+			code = *result.Output.Error.Code
+		}
+		if result.Output.Error.Message != nil {
+			msg = *result.Output.Error.Message
+		}
+		t.Fatalf("expected exit code 0, got %d; error code=%s, message=%s", result.ExitCode, code, msg)
 	}
 	if !result.Output.Success {
 		t.Error("expected success=true")
