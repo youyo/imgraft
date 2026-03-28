@@ -1,8 +1,12 @@
 package app_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"image"
+	"image/color"
+	"image/png"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -16,21 +20,30 @@ import (
 	"github.com/youyo/imgraft/internal/runtime"
 )
 
-// minimalPNG は 1x1 の最小 PNG バイト列。
-// transparent パイプライン（M14/M15）の前に SavePNG のテストに使う。
+// minimalPNG は透明パイプラインを通過できるテスト用 PNG。
+// 純緑背景(#00FF00)に赤い前景オブジェクトを持つ 20x20 画像。
+// transparent パイプライン（M15）実装後はこの形式が必要。
 var minimalPNG = func() []byte {
-	// 1x1 黒ピクセル PNG (正確な PNG バイナリ)
-	return []byte{
-		0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
-		0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
-		0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
-		0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53,
-		0xDE, 0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41,
-		0x54, 0x08, 0xD7, 0x63, 0xF8, 0xCF, 0xC0, 0x00,
-		0x00, 0x00, 0x02, 0x00, 0x01, 0xE2, 0x21, 0xBC,
-		0x33, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E,
-		0x44, 0xAE, 0x42, 0x60, 0x82,
+	img := image.NewRGBA(image.Rect(0, 0, 20, 20))
+	green := color.RGBA{R: 0, G: 255, B: 0, A: 255}
+	red := color.RGBA{R: 255, G: 0, B: 0, A: 255}
+	// 全体を純緑にする
+	for y := range 20 {
+		for x := range 20 {
+			img.SetRGBA(x, y, green)
+		}
 	}
+	// 中央 8x8 を赤にする（前景オブジェクト）
+	for y := 6; y < 14; y++ {
+		for x := 6; x < 14; x++ {
+			img.SetRGBA(x, y, red)
+		}
+	}
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		panic("failed to encode test PNG: " + err.Error())
+	}
+	return buf.Bytes()
 }()
 
 // mockStudioClient は studio.StudioClient のモック実装。

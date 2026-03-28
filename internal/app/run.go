@@ -11,6 +11,7 @@ import (
 	"github.com/youyo/imgraft/internal/backend/studio"
 	"github.com/youyo/imgraft/internal/config"
 	"github.com/youyo/imgraft/internal/errs"
+	"github.com/youyo/imgraft/internal/imageproc"
 	"github.com/youyo/imgraft/internal/model"
 	"github.com/youyo/imgraft/internal/output"
 	"github.com/youyo/imgraft/internal/prompt"
@@ -141,9 +142,27 @@ func Run(ctx context.Context, input RunInput, deps Dependencies) RunOutput {
 		}
 	}
 
-	// ステップ 10: Transparent pipeline（M14/M15 以降）
-	// 現在は未実装のため、生成された画像データをそのまま使用
+	// ステップ 10: Transparent pipeline
 	imageData := genResp.ImageData
+	transparentApplied := false
+	if transparent {
+		// 生成画像をデコードしてパイプラインを適用する
+		decoded, _, err := imageproc.Decode(imageData)
+		if err != nil {
+			return errorOutput(&modelName, strPtr(backend), err)
+		}
+		processed, applied, err := imageproc.TransparentPipeline(decoded, imageproc.DefaultThreshold)
+		if err != nil {
+			return errorOutput(&modelName, strPtr(backend), err)
+		}
+		// 処理済み画像を PNG に再エンコードする
+		encoded, err := imageproc.EncodePNG(processed)
+		if err != nil {
+			return errorOutput(&modelName, strPtr(backend), err)
+		}
+		imageData = encoded
+		transparentApplied = applied
+	}
 
 	// ステップ 11: Save
 	saveOpts := output.SaveOptions{
@@ -151,7 +170,7 @@ func Run(ctx context.Context, input RunInput, deps Dependencies) RunOutput {
 		Dir:                resolveDir(input.Dir, cfg),
 		Clock:              deps.Clock,
 		Index:              0,
-		TransparentApplied: false, // M14/M15 実装後に更新
+		TransparentApplied: transparentApplied,
 	}
 	item, err := output.SavePNG(imageData, saveOpts)
 	if err != nil {
