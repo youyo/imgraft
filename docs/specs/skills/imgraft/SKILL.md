@@ -108,16 +108,22 @@ imgraft "scene illustration" --no-transparent
 imgraft "blue robot mascot, simple, modern"
 ```
 
-### 参照画像付き
+### 参照画像付き（ローカルファイル）
 
 ```bash
 imgraft "convert to icon style" --ref ./input.png
 ```
 
-### URL 参照画像付き
+### 参照画像付き（URL）
 
 ```bash
 imgraft "convert to sticker style" --ref https://example.com/input.png
+```
+
+### 参照画像複数枚
+
+```bash
+imgraft "redesign to match style" --ref ./subject.png --ref ./style.png
 ```
 
 ### 高品質寄り
@@ -136,6 +142,12 @@ imgraft "cute cat icon, pastel" --dir ./out
 
 ```bash
 imgraft "app icon, line style" --output ./asset.png
+```
+
+### JSON 整形出力
+
+```bash
+imgraft "settings icon" --pretty
 ```
 
 ---
@@ -167,9 +179,7 @@ imgraft "app icon, line style" --output ./asset.png
 
 避けたいもの:
 
-- GIF
-- SVG
-- PDF
+- GIF、SVG、PDF
 - 20MB 超の巨大画像
 - localhost / private IP の URL
 
@@ -186,16 +196,15 @@ imgraft "app icon, line style" --output ./asset.png
 
 主な対応方針:
 
-- `RATE_LIMIT_EXCEEDED`
-  - 少し待って再実行
-- `FILE_NOT_FOUND`
-  - 参照画像パスを修正
-- `REFERENCE_FETCH_FAILED`
-  - URL を見直す
-- `REFERENCE_URL_FORBIDDEN`
-  - private URL を使っていないか確認
-- `UNSUPPORTED_IMAGE_FORMAT`
-  - PNG/JPEG/WebP に変換して再実行
+| コード | 対応 |
+|--------|------|
+| `RATE_LIMIT_EXCEEDED` | 少し待って再実行 |
+| `FILE_NOT_FOUND` | 参照画像パスを修正 |
+| `REFERENCE_FETCH_FAILED` | URL を見直す |
+| `REFERENCE_URL_FORBIDDEN` | private URL を使っていないか確認 |
+| `UNSUPPORTED_IMAGE_FORMAT` | PNG/JPEG/WebP に変換して再実行 |
+| `AUTH_REQUIRED` | `imgraft auth login` を実行 |
+| `AUTH_INVALID` | `imgraft auth whoami` で API key を確認 |
 
 ---
 
@@ -203,9 +212,9 @@ imgraft "app icon, line style" --output ./asset.png
 
 代表例:
 
-- `model fallback: pro -> flash`
-- `background removal quality may be low`
-- `using http reference URL`
+- `model fallback: pro -> flash` — pro を指定したが flash を使用した
+- `background removal quality may be low` — 透過品質が低い可能性あり
+- `using http reference URL` — https の使用を推奨
 
 `warnings` は即失敗ではありません。必要に応じて再実行条件の判断材料に使います。
 
@@ -243,6 +252,44 @@ imgraft "app icon, line style" --output ./asset.png
 
 ---
 
+## JSON 出力スキーマ参照
+
+```json
+{
+  "success": true,
+  "model": "gemini-3.1-flash-image-preview",
+  "backend": "google_ai_studio",
+  "images": [
+    {
+      "index": 0,
+      "path": "/abs/path/imgraft-20260324-153012-001.png",
+      "filename": "imgraft-20260324-153012-001.png",
+      "width": 1024,
+      "height": 1024,
+      "mime_type": "image/png",
+      "sha256": "abc123...",
+      "transparent_applied": true
+    }
+  ],
+  "rate_limit": {
+    "provider": "google_ai_studio",
+    "limit_type": null,
+    "requests_limit": null,
+    "requests_remaining": null,
+    "requests_used": null,
+    "reset_at": null,
+    "retry_after_seconds": null
+  },
+  "warnings": [],
+  "error": {
+    "code": null,
+    "message": null
+  }
+}
+```
+
+---
+
 ## 推奨テンプレート
 
 ```text
@@ -261,9 +308,8 @@ Rules:
 ## やってはいけないこと
 
 - 長文 prompt を投げる
-- 背景を詳細に指示する
+- 背景を詳細に指示する（transparent モード時）
 - stdout の JSON ではなく stderr を正として扱う
 - 参照画像エラーを無視する
-- `warnings` を success と混同する
+- `warnings` を `success: false` と混同する
 - 完成作品向けの複雑なシーン生成に `imgraft` を無理に使う
-
