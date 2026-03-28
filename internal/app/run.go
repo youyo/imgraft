@@ -14,6 +14,7 @@ import (
 	"github.com/youyo/imgraft/internal/model"
 	"github.com/youyo/imgraft/internal/output"
 	"github.com/youyo/imgraft/internal/prompt"
+	"github.com/youyo/imgraft/internal/reference"
 	"github.com/youyo/imgraft/internal/runtime"
 )
 
@@ -97,8 +98,12 @@ func Run(ctx context.Context, input RunInput, deps Dependencies) RunOutput {
 	// ステップ 6: Model resolve
 	modelName := model.Resolve(input.ModelAlias, cfg)
 
-	// ステップ 7: Reference load/validate（M12 以降）
-	// 現在は未実装のためスキップ
+	// ステップ 7: Reference load/validate
+	refs, err := loadAndValidateRefs(input.Refs)
+	if err != nil {
+		return errorOutput(nil, nil, err)
+	}
+	_ = refs // M13以降でプロンプト構築に渡す
 
 	// ステップ 8: Prompt build
 	transparent := !input.NoTransparent
@@ -209,6 +214,29 @@ func extractPromptParts(parts []prompt.Part) (systemPrompt, userPrompt string) {
 		}
 	}
 	return
+}
+
+// loadAndValidateRefs は参照画像パスのリストを読み込み・検証して ReferenceImage スライスを返す。
+// 1 枚でも不正なら fail-fast でエラーを返す。
+func loadAndValidateRefs(paths []string) ([]reference.ReferenceImage, error) {
+	if len(paths) == 0 {
+		return nil, nil
+	}
+
+	refs := make([]reference.ReferenceImage, 0, len(paths))
+	for _, p := range paths {
+		ref, err := reference.LoadLocalFile(p)
+		if err != nil {
+			return nil, err
+		}
+		refs = append(refs, ref)
+	}
+
+	if err := reference.Validate(refs); err != nil {
+		return nil, err
+	}
+
+	return refs, nil
 }
 
 // errorOutput はエラー時の RunOutput を生成する。
