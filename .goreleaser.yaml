@@ -74,6 +74,8 @@ brews:
     repository:
       owner: youyo
       name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    directory: Formula
     homepage: "https://github.com/youyo/imgraft"
     description: "Transparent image asset generator for LLM coding agents"
     license: "MIT"
