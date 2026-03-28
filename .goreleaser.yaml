@@ -1,0 +1,83 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+# vim: set ts=2 sw=2 tw=0 fo=cnqoj
+
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: imgraft
+    main: ./cmd/imgraft/
+    binary: imgraft
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X github.com/youyo/imgraft/internal/cli.Version={{.Version}}
+      - -X github.com/youyo/imgraft/internal/cli.Commit={{.ShortCommit}}
+      - -X github.com/youyo/imgraft/internal/cli.Date={{.Date}}
+
+archives:
+  - id: imgraft
+    builds:
+      - imgraft
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "arm64" }}arm64
+      {{- else }}{{ .Arch }}{{ end }}
+    format_overrides:
+      - goos: darwin
+        formats:
+          - zip
+      - goos: linux
+        formats:
+          - tar.gz
+
+checksum:
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+changelog:
+  sort: asc
+  use: git
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore(deps):"
+      - Merge pull request
+      - Merge branch
+  groups:
+    - title: Features
+      regexp: "^feat"
+      order: 0
+    - title: Bug Fixes
+      regexp: "^fix"
+      order: 1
+    - title: Others
+      order: 999
+
+brews:
+  - name: imgraft
+    ids:
+      - imgraft
+    repository:
+      owner: youyo
+      name: homebrew-tap
+    homepage: "https://github.com/youyo/imgraft"
+    description: "Transparent image asset generator for LLM coding agents"
+    license: "MIT"
+    install: |
+      bin.install "imgraft"
+    test: |
+      system "#{bin}/imgraft", "version"

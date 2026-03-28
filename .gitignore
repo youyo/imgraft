@@ -1,0 +1,8 @@
+# GoReleaser output
+dist/
+
+# Build binary
+imgraft
+
+# Windows binary
+*.exe
