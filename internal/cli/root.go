@@ -13,10 +13,11 @@ type CLI struct {
 	// メイン生成コマンド（デフォルトコマンド）
 	Generate GenerateCmd `cmd:"" default:"withargs" help:"Generate a transparent image asset (default command)"`
 
-	// サブコマンド（M18-M20 で実装予定）
-	Auth    AuthCmd    `cmd:"" help:"Authentication commands"`
-	Config  ConfigCmd  `cmd:"" help:"Configuration commands"`
-	Version VersionCmd `cmd:"" help:"Show version information"`
+	// サブコマンド
+	Auth       AuthCmd       `cmd:"" help:"Authentication commands"`
+	Config     ConfigCmd     `cmd:"" help:"Configuration commands"`
+	Version    VersionCmd    `cmd:"" help:"Show version information"`
+	Completion CompletionCmd `cmd:"" help:"Generate shell completion script"`
 }
 
 // GenerateCmd はメイン画像生成コマンドの引数とフラグ。
@@ -94,13 +95,9 @@ func (c *ConfigRefreshModelsCmd) Run() error {
 	return runConfigRefreshModelsInteractive()
 }
 
-// VersionCmd は version サブコマンド（M20 で実装予定）。
+// VersionCmd は version サブコマンド。
+// Run メソッドは version.go で定義する。
 type VersionCmd struct{}
-
-// Run は M20 で実装される。
-func (c *VersionCmd) Run() error {
-	return errNotImplemented("version")
-}
 
 // errNotImplemented は未実装コマンドのエラーを返す。
 func errNotImplemented(cmd string) error {
