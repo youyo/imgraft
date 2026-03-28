@@ -64,12 +64,16 @@ type ConfigCmd struct {
 	RefreshModels ConfigRefreshModelsCmd `cmd:"" help:"Refresh model list from API"`
 }
 
-// ConfigInitCmd は config init サブコマンド（M19 で実装予定）。
-type ConfigInitCmd struct{}
+// ConfigInitCmd は config init サブコマンド（M19 実装済み）。
+// フラグを指定すれば非対話実行、省略すれば stdin から対話入力を受け付ける。
+type ConfigInitCmd struct {
+	APIKey  string `name:"api-key" help:"Google AI Studio API key (skip interactive prompt)" default:""`
+	Profile string `name:"profile" help:"Profile name (default: 'default')" default:""`
+}
 
-// Run は M19 で実装される。
+// Run は config init フローを実行する。
 func (c *ConfigInitCmd) Run() error {
-	return errNotImplemented("config init")
+	return runConfigInitInteractive(c)
 }
 
 // ConfigUseCmd は config use サブコマンド（M19 で実装予定）。
@@ -77,17 +81,17 @@ type ConfigUseCmd struct {
 	Profile string `arg:"" help:"Profile name to switch to"`
 }
 
-// Run は M19 で実装される。
+// Run は config use フローを実行する。
 func (c *ConfigUseCmd) Run() error {
-	return errNotImplemented("config use")
+	return runConfigUseInteractive(c)
 }
 
-// ConfigRefreshModelsCmd は config refresh-models サブコマンド（M19 で実装予定）。
+// ConfigRefreshModelsCmd は config refresh-models サブコマンド（M19 実装済み）。
 type ConfigRefreshModelsCmd struct{}
 
-// Run は M19 で実装される。
+// Run は config refresh-models フローを実行する。
 func (c *ConfigRefreshModelsCmd) Run() error {
-	return errNotImplemented("config refresh-models")
+	return runConfigRefreshModelsInteractive()
 }
 
 // VersionCmd は version サブコマンド（M20 で実装予定）。
