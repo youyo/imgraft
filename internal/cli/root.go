@@ -35,36 +35,27 @@ type GenerateCmd struct {
 	Debug         bool     `name:"debug" help:"Enable debug logging to stderr"`
 }
 
-// AuthCmd は auth サブコマンドグループ（M18 で実装予定）。
+// AuthCmd は auth サブコマンドグループ。
 type AuthCmd struct {
 	Login  AuthLoginCmd  `cmd:"" help:"Login to backend"`
 	Logout AuthLogoutCmd `cmd:"" help:"Logout from backend"`
 	Whoami AuthWhoamiCmd `cmd:"" help:"Show current authentication status"`
 }
 
-// AuthLoginCmd は auth login サブコマンド（M18 で実装予定）。
-type AuthLoginCmd struct{}
-
-// Run は M18 で実装される。
-func (c *AuthLoginCmd) Run() error {
-	return errNotImplemented("auth login")
+// AuthLoginCmd は auth login サブコマンド（M18 実装済み）。
+// フラグを指定すれば非対話実行、省略すれば stdin から対話入力を受け付ける。
+type AuthLoginCmd struct {
+	APIKey  string `name:"api-key" help:"Google AI Studio API key (skip interactive prompt)" default:""`
+	Profile string `name:"profile" help:"Profile name (default: 'default')" default:""`
 }
 
-// AuthLogoutCmd は auth logout サブコマンド（M18 で実装予定）。
-type AuthLogoutCmd struct{}
-
-// Run は M18 で実装される。
-func (c *AuthLogoutCmd) Run() error {
-	return errNotImplemented("auth logout")
+// AuthLogoutCmd は auth logout サブコマンド（M18 実装済み）。
+type AuthLogoutCmd struct {
+	Profile string `name:"profile" help:"Profile name to logout (default: current profile)" default:""`
 }
 
-// AuthWhoamiCmd は auth whoami サブコマンド（M18 で実装予定）。
+// AuthWhoamiCmd は auth whoami サブコマンド（M18 実装済み）。
 type AuthWhoamiCmd struct{}
-
-// Run は M18 で実装される。
-func (c *AuthWhoamiCmd) Run() error {
-	return errNotImplemented("auth whoami")
-}
 
 // ConfigCmd は config サブコマンドグループ（M18/M19 で実装予定）。
 type ConfigCmd struct {
