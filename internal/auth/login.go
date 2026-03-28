@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -134,8 +135,9 @@ func Login(ctx context.Context, opts LoginOptions) (LoginResult, error) {
 	}, nil
 }
 
-// promptInput は reader から1行読み取り、末尾の改行を除去して返す。
-func promptInput(reader *bufio.Reader, _ string) (string, error) {
+// promptInput はプロンプトを stderr に表示し、reader から1行読み取り、末尾の改行を除去して返す。
+func promptInput(reader *bufio.Reader, prompt string) (string, error) {
+	fmt.Fprint(os.Stderr, prompt)
 	line, err := reader.ReadString('\n')
 	if err != nil && err != io.EOF {
 		return "", err
